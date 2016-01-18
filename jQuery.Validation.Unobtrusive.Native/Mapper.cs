@@ -1,9 +1,9 @@
-﻿using System.Collections.Generic;
+﻿using Newtonsoft.Json;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Web.Routing;
-using Newtonsoft.Json;
 
 namespace System.Web.Mvc.Html
 {
@@ -19,7 +19,7 @@ namespace System.Web.Mvc.Html
             ModelMetadata metadata)
         {
             RouteValueDictionary attributes = null;
-            
+
             // prevent double conversion
             if (htmlAttributes is RouteValueDictionary)
                 attributes = (RouteValueDictionary)htmlAttributes;
@@ -31,6 +31,9 @@ namespace System.Web.Mvc.Html
             // If client validation or unobtrusive javascript are disabled then there's really nothing to do
             if (!HtmlHelper.ClientValidationEnabled || !HtmlHelper.UnobtrusiveJavaScriptEnabled)
                 return attributes;
+
+            var propertyName = helper.NameFor(expression).ToString();
+            var unobtrusiveValidationAttributes = helper.GetUnobtrusiveValidationAttributes(propertyName, metadata);
 
             // get validators so we can get the contained ModelClientValidationRules
             var validators = ModelValidatorProviders.Providers.GetValidators(metadata, helper.ViewContext);
@@ -97,12 +100,37 @@ namespace System.Web.Mvc.Html
                 }
             }
 
+            // For external libraries like ExpressiveAnnotations
+            foreach (var rule in unobtrusiveValidationAttributes)
+            {
+                switch (rule.Key)
+                {
+                    case "data-val":
+                    case "data-val-assertthat":
+                    case "data-val-assertthat-expression":
+                    case "data-val-assertthat-fieldsmap":
+                    case "data-val-assertthat-constsmap":
+                    case "data-val-assertthat-parsersmap":
+                    case "data-val-assertthat-errfieldsmap":
+                    case "data-val-requiredif":
+                    case "data-val-requiredif-expression":
+                    case "data-val-requiredif-fieldsmap":
+                    case "data-val-requiredif-constsmap":
+                    case "data-val-requiredif-parsersmap":
+                    case "data-val-requiredif-errfieldsmap":
+                        attributes.AddIfNotPresent(rule.Key, unobtrusiveValidationAttributes[rule.Key]);
+                        break;
+                    default:
+                        break;
+                }
+            }
+
             return attributes;
         }
 
         private static void AddIfNotPresent(this IDictionary<string, object> attributes, string attrKey, object attrValue)
         {
-            if (!attributes.ContainsKey(attrKey)) 
+            if (!attributes.ContainsKey(attrKey))
                 attributes.Add(attrKey, attrValue);
         }
 
